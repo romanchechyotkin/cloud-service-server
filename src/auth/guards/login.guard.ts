@@ -15,9 +15,6 @@ export class LoginGuard implements CanActivate {
         if (!user) {
             throw new UnauthorizedException(`user not found`)
         }
-        if (user.password !== password) {
-            throw new UnauthorizedException(`wrong password`)
-        }
         return true;
     }
 }
