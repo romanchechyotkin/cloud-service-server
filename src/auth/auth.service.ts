@@ -4,12 +4,18 @@ import {UsersService} from "../users/users.service";
 import * as bcrypt from 'bcryptjs'
 import {JwtService} from "@nestjs/jwt";
 import {jwtConstants} from "./constants";
+import {FilesService} from "../files/files.service";
+import {File, FileDocument} from "../files/files.schema";
+import {InjectModel} from "@nestjs/mongoose";
+import {Model} from "mongoose";
 
 @Injectable()
 export class AuthService {
 
     constructor(private usersService: UsersService,
-                private jwtService: JwtService) {}
+                private fileService: FilesService,
+                private jwtService: JwtService,
+                @InjectModel(File.name) private fileModel: Model<FileDocument>) {}
 
     async registration(dto: CreateUserDto) {
         const candidate = await this.usersService.findOne(dto.email)
@@ -18,6 +24,8 @@ export class AuthService {
         }
         const hashPassword = await bcrypt.hash(dto.password, 2)
         const createdUser = await this.usersService.createUser({email: dto.email, password: hashPassword})
+        const file = await new this.fileModel({user: createdUser._id, name: ''})
+        await this.fileService.createDir(file)
         return createdUser
     }
 

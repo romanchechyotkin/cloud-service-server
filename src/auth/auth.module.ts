@@ -4,16 +4,22 @@ import {AuthService} from './auth.service';
 import {UsersModule} from "../users/users.module";
 import {JwtModule} from "@nestjs/jwt";
 import {jwtConstants} from "./constants";
+import {FilesModule} from "../files/files.module";
+import {FilesService} from "../files/files.service";
+import {MongooseModule} from "@nestjs/mongoose";
+import {File, FileSchema} from "../files/files.schema";
 
 @Module({
     controllers: [AuthController],
     providers: [AuthService],
     imports: [
         UsersModule,
+        FilesModule,
         JwtModule.register({
             secret: jwtConstants.secret,
             signOptions: {expiresIn: '30s'},
         }),
+        MongooseModule.forFeature([{name: File.name, schema: FileSchema}])
     ],
     exports: [AuthService]
 })
