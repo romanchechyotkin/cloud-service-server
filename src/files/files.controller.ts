@@ -24,7 +24,6 @@ export class FilesController {
             user: req.user.user._id
         })
         const parentFile = await this.fileModel.findOne({_id: createFileDto.parent})
-        console.log(parentFile)
         if (!parentFile) {
             file.path = createFileDto.name
             await this.fileService.createDir(file)

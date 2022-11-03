@@ -17,7 +17,7 @@ import {File, FileSchema} from "../files/files.schema";
         FilesModule,
         JwtModule.register({
             secret: jwtConstants.secret,
-            signOptions: {expiresIn: '30s'},
+            signOptions: {expiresIn: '15min'},
         }),
         MongooseModule.forFeature([{name: File.name, schema: FileSchema}])
     ],
