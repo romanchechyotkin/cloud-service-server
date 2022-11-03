@@ -22,6 +22,9 @@ export class File {
     @Prop({default: ""})
     path: string;
 
+    @Prop({default: Date.now()})
+    date: Date;
+
     @Prop({type: mongoose.Schema.Types.ObjectId, ref: "User"})
     user: User;
 
