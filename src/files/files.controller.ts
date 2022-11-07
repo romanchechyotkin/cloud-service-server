@@ -72,14 +72,14 @@ export class FilesController {
         const user = await this.userService.findOneById(req.user.user._id)
 
         if (user.usedSpace + file.size > user.diskSpace) {
-            throw new UnauthorizedException({message: 'No space for files'})
+            throw new UnauthorizedException(`full disk space`)
         }
 
         user.usedSpace = user.usedSpace + file.size
 
         let userFilePath;
         const filePath = path.join(__dirname, "..", "..", "usersFiles")
-        console.log(filePath)
+
         if (parent) {
             userFilePath = `${filePath}\\${user._id}\\${parent.path}\\${file.originalname}`
         } else {
@@ -87,7 +87,7 @@ export class FilesController {
         }
 
         if (fs.existsSync(userFilePath)) {
-            throw new UnauthorizedException({message: 'already exists'})
+            throw new UnauthorizedException(`already exists`)
         }
 
         fs.writeFileSync(userFilePath, file.buffer)
