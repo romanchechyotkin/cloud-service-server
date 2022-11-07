@@ -1,14 +1,29 @@
-import {Body, Controller, Get, Post, Req, Res, UseGuards} from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Get,
+    Post,
+    Req,
+    UnauthorizedException,
+    UploadedFiles,
+    UseGuards,
+    UseInterceptors
+} from '@nestjs/common';
 import {File, FileDocument} from "./files.schema";
 import {InjectModel} from "@nestjs/mongoose";
 import {Model} from "mongoose";
 import {FilesService} from "./files.service";
 import {FilesGuard} from "./guards/files.guard";
+import {FilesInterceptor} from "@nestjs/platform-express";
+import {UsersService} from "../users/users.service";
+import * as path from "path";
+import * as fs from "fs";
 
 @Controller('files')
 export class FilesController {
 
     constructor(@InjectModel (File.name) private fileModel: Model<FileDocument>,
+                private userService: UsersService,
                 private fileService: FilesService) {}
 
     @UseGuards(FilesGuard)
@@ -44,5 +59,53 @@ export class FilesController {
         return files
     }
 
+    @UseGuards(FilesGuard)
+    @Post("/uploadFile")
+    @UseInterceptors(FilesInterceptor('file'))
+    async uploadFile(@UploadedFiles() files: Array<Express.Multer.File>,
+                     @Body() fileDto,
+                     @Req() req
+    ) {
+        const file = files[0]
+
+        const parent = await this.fileModel.findOne({user: req.user.user._id, _id: fileDto.parent})
+        const user = await this.userService.findOneById(req.user.user._id)
+
+        if (user.usedSpace + file.size > user.diskSpace) {
+            throw new UnauthorizedException({message: 'No space for files'})
+        }
+
+        user.usedSpace = user.usedSpace + file.size
+
+        let userFilePath;
+        const filePath = path.join(__dirname, "..", "..", "usersFiles")
+        console.log(filePath)
+        if (parent) {
+            userFilePath = `${filePath}\\${user._id}\\${parent.path}\\${file.originalname}`
+        } else {
+            userFilePath = `${filePath}\\${user._id}\\${file.originalname}`
+        }
+
+        if (fs.existsSync(userFilePath)) {
+            throw new UnauthorizedException({message: 'already exists'})
+        }
+
+        fs.writeFileSync(userFilePath, file.buffer)
+
+        const type = file.originalname.split('.').pop()
+        const dbFile = await this.fileModel.create({
+            name: file.originalname,
+            type,
+            size: file.size,
+            path: parent?.path,
+            parent: parent?._id,
+            user: user._id
+        })
+
+        await dbFile.save()
+        await user.save()
+
+        return dbFile
+    }
 
 }

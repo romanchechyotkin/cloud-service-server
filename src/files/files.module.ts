@@ -4,13 +4,15 @@ import {FilesController} from './files.controller';
 import {MongooseModule} from "@nestjs/mongoose";
 import {FileSchema, File} from "./files.schema";
 import {JwtModule} from "@nestjs/jwt";
+import {UsersModule} from "../users/users.module";
 
 @Module({
   providers: [FilesService],
   controllers: [FilesController],
   imports: [
       MongooseModule.forFeature([{name: File.name, schema: FileSchema}]),
-      JwtModule
+      JwtModule,
+      UsersModule,
   ],
   exports: [FilesService]
 })
