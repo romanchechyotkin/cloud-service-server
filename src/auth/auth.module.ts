@@ -5,7 +5,6 @@ import {UsersModule} from "../users/users.module";
 import {JwtModule} from "@nestjs/jwt";
 import {jwtConstants} from "./constants";
 import {FilesModule} from "../files/files.module";
-import {FilesService} from "../files/files.service";
 import {MongooseModule} from "@nestjs/mongoose";
 import {File, FileSchema} from "../files/files.schema";
 
@@ -17,7 +16,7 @@ import {File, FileSchema} from "../files/files.schema";
         FilesModule,
         JwtModule.register({
             secret: jwtConstants.secret,
-            signOptions: {expiresIn: '15min'},
+            signOptions: {expiresIn: '24h'},
         }),
         MongooseModule.forFeature([{name: File.name, schema: FileSchema}])
     ],
