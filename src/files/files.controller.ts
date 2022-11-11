@@ -1,7 +1,7 @@
 import {
     Body,
-    Controller,
-    Get,
+    Controller, Delete,
+    Get, Param,
     Post, Query, Req, Res,
     UnauthorizedException,
     UploadedFiles,
@@ -93,11 +93,16 @@ export class FilesController {
         fs.writeFileSync(userFilePath, file.buffer)
 
         const type = file.originalname.split('.').pop()
+        let pathFile = file.originalname
+        if (parent) {
+            pathFile = parent.path + "\\" + file.originalname
+        }
+
         const dbFile = await this.fileModel.create({
             name: file.originalname,
             type,
             size: file.size,
-            path: parent?.path,
+            path: pathFile,
             parent: parent?._id,
             user: user._id
         })
@@ -112,12 +117,28 @@ export class FilesController {
     @Get('/download')
     async download(@Res() res: Response, @Req() req, @Query("id") id: string) {
         const file = await this.fileModel.findOne({_id: id, user: req.user.user._id})
-        const filePath = path.join(__dirname, "..", "..", "usersFiles", req.user.user._id, file.path, file.name)
-        console.log(filePath)
+        const filePath = path.join(__dirname, "..", "..", "usersFiles", req.user.user._id, file.path)
         if (fs.existsSync(filePath)) {
             res.download(filePath, file.name)
         } else {
             throw new UnauthorizedException(`Download error`)
+        }
+    }
+
+    @UseGuards(FilesGuard)
+    @Delete('/delete')
+    async delete(@Res() res: Response, @Req() req, @Query("id") id: string) {
+        try {
+            const file = await this.fileModel.findOne({_id: id, user: req.user.user._id})
+            if (!file) {
+                return res.status(400).json({message: 'file not found'})
+            }
+            await this.fileService.deleteFile(file, req.user.user._id)
+            await this.fileModel.deleteOne({_id: file._id})
+            return res.json({message: 'File was deleted'})
+        } catch (e) {
+            console.log(e)
+            return res.status(400).json({message: 'Dir is not empty'})
         }
     }
 

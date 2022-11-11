@@ -26,4 +26,18 @@ export class FilesService {
         })
     }
 
+    async deleteFile(file, userId) {
+        const path = await this.getPath(file, userId)
+        if (file.type === 'dir') {
+            fs.rmdirSync(path)
+        } else {
+            fs.unlinkSync(path)
+        }
+    }
+
+    async getPath(file, userId) {
+        const filePath = path.join(__dirname, "..", "..", "usersFiles", userId, file.path)
+        return filePath
+    }
+
 }
