@@ -2,8 +2,7 @@ import {
     Body,
     Controller,
     Get,
-    Post,
-    Req,
+    Post, Query, Req, Res,
     UnauthorizedException,
     UploadedFiles,
     UseGuards,
@@ -18,6 +17,7 @@ import {FilesInterceptor} from "@nestjs/platform-express";
 import {UsersService} from "../users/users.service";
 import * as path from "path";
 import * as fs from "fs";
+import {Response} from "express";
 
 @Controller('files')
 export class FilesController {
@@ -106,6 +106,19 @@ export class FilesController {
         await user.save()
 
         return dbFile
+    }
+
+    @UseGuards(FilesGuard)
+    @Get('/download')
+    async download(@Res() res: Response, @Req() req, @Query("id") id: string) {
+        const file = await this.fileModel.findOne({_id: id, user: req.user.user._id})
+        const filePath = path.join(__dirname, "..", "..", "usersFiles", req.user.user._id, file.path, file.name)
+        console.log(filePath)
+        if (fs.existsSync(filePath)) {
+            res.download(filePath, file.name)
+        } else {
+            throw new UnauthorizedException(`Download error`)
+        }
     }
 
 }
