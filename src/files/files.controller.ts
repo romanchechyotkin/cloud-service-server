@@ -167,4 +167,13 @@ export class FilesController {
         }
     }
 
+    @UseGuards(FilesGuard)
+    @Get("/search")
+    async search(@Query("searchName") searchName, @Req() req) {
+        let files = await this.fileModel.find({user: req.user.user._id})
+        files = files.filter(file => file.name.includes(searchName))
+        return files
+    }
+
+
 }
