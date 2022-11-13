@@ -54,8 +54,33 @@ export class FilesController {
 
     @UseGuards(FilesGuard)
     @Get()
-    async getFiles(@Req() req) {
-        const files = await this.fileModel.find({user: req.user.user._id, parent: req.query.parent})
+    async getFiles(@Req() req, @Query("sort") sort: string) {
+        let files;
+        switch (sort) {
+            case ("name"):
+                files = await this.fileModel.find({user: req.user.user._id, parent: req.query.parent}).sort({name: 1})
+                break
+
+            case ("size-greater"):
+                files = await this.fileModel.find({user: req.user.user._id, parent: req.query.parent}).sort({size: 1})
+                break
+
+            case ("size-lower"):
+                files = await this.fileModel.find({user: req.user.user._id, parent: req.query.parent}).sort({size: -1})
+                break
+
+            case ("type"):
+                files = await this.fileModel.find({user: req.user.user._id, parent: req.query.parent}).sort({type: 1})
+                break
+
+            default:
+                files = await this.fileModel.find({user: req.user.user._id, parent: req.query.parent})
+                break
+
+            case ("date"):
+                files = await this.fileModel.find({user: req.user.user._id, parent: req.query.parent}).sort({date: 1})
+                break
+        }
         return files
     }
 
