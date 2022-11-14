@@ -1,7 +1,7 @@
 import {
     Body,
     Controller, Delete,
-    Get, Param,
+    Get,
     Post, Query, Req, Res,
     UnauthorizedException,
     UploadedFiles,
@@ -17,6 +17,7 @@ import {FilesInterceptor} from "@nestjs/platform-express";
 import {UsersService} from "../users/users.service";
 import * as path from "path";
 import * as fs from "fs";
+import * as uuid from "uuid";
 import {Response} from "express";
 
 @Controller('files')
@@ -78,7 +79,7 @@ export class FilesController {
                 break
 
             case ("date"):
-                files = await this.fileModel.find({user: req.user.user._id, parent: req.query.parent}).sort({date: 1})
+                files = await this.fileModel.find({user: req.user.user._id, parent: req.query.parent}).sort({date: -1})
                 break
         }
         return files
@@ -175,5 +176,19 @@ export class FilesController {
         return files
     }
 
-
+    @UseGuards(FilesGuard)
+    @Post("/avatar")
+    @UseInterceptors(FilesInterceptor('file'))
+    async uploadAvatar(@Req() req, @UploadedFiles() files: Array<Express.Multer.File>) {
+        const file = files[0]
+        console.log(file)
+        const user = await this.userService.findOneById(req.user.user._id)
+        console.log(user)
+        const avatarName = uuid.v4() + '.jpg'
+        const filePath = path.resolve(__dirname, '..', 'static')
+        fs.writeFileSync(path.resolve(filePath, avatarName), file.buffer)
+        user.avatar = avatarName
+        await user.save()
+        return user
+    }
 }
