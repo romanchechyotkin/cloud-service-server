@@ -27,6 +27,8 @@ export class FilesController {
                 private userService: UsersService,
                 private fileService: FilesService) {}
 
+    // throw new HttpException('user not found', HttpStatus.BAD_REQUEST)
+
     @UseGuards(FilesGuard)
     @Post('')
     async createDir(

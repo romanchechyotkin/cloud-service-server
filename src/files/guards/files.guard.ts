@@ -1,4 +1,11 @@
-import {CanActivate, ExecutionContext, Injectable, UnauthorizedException} from "@nestjs/common";
+import {
+    CanActivate,
+    ExecutionContext,
+    HttpException,
+    HttpStatus,
+    Injectable,
+    UnauthorizedException
+} from "@nestjs/common";
 import {Observable} from "rxjs";
 import {JwtService} from "@nestjs/jwt";
 import {jwtConstants} from "../../auth/constants";
@@ -17,7 +24,7 @@ export class FilesGuard implements CanActivate {
             const token = authHeader.split(' ')[1]
 
             if (bearer !== 'Bearer' || !token) {
-                throw new UnauthorizedException({message: 'Пользователь не авторизован'})
+                throw new HttpException('user not login', HttpStatus.UNAUTHORIZED)
             }
 
             const user = this.jwtService.verify(token, {secret: jwtConstants.secret});
@@ -25,7 +32,7 @@ export class FilesGuard implements CanActivate {
         }
         catch (e) {
             console.log(e)
-            throw new UnauthorizedException({message: 'Пользователь не авторизован'})
+            throw new HttpException('user not login', HttpStatus.UNAUTHORIZED)
         }
     }
 }
