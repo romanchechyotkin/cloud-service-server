@@ -17,7 +17,7 @@ export class File {
     accessLink: string;
 
     @Prop({default: 0})
-    size: number;
+    fileSize: number;
 
     @Prop({default: ""})
     path: string;

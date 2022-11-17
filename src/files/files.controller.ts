@@ -27,8 +27,6 @@ export class FilesController {
                 private userService: UsersService,
                 private fileService: FilesService) {}
 
-    // throw new HttpException('user not found', HttpStatus.BAD_REQUEST)
-
     @UseGuards(FilesGuard)
     @Post('')
     async createDir(
@@ -65,11 +63,11 @@ export class FilesController {
                 break
 
             case ("size-greater"):
-                files = await this.fileModel.find({user: req.user.user._id, parent: req.query.parent}).sort({size: 1})
+                files = await this.fileModel.find({user: req.user.user._id, parent: req.query.parent}).sort({fileSize: 1})
                 break
 
             case ("size-lower"):
-                files = await this.fileModel.find({user: req.user.user._id, parent: req.query.parent}).sort({size: -1})
+                files = await this.fileModel.find({user: req.user.user._id, parent: req.query.parent}).sort({fileSize: -1})
                 break
 
             case ("type"):
@@ -94,6 +92,7 @@ export class FilesController {
                      @Body() fileDto,
                      @Req() req
     ) {
+        console.log(files)
         const file = files[0]
 
         const parent = await this.fileModel.findOne({user: req.user.user._id, _id: fileDto.parent})
@@ -103,7 +102,9 @@ export class FilesController {
             throw new UnauthorizedException(`full disk space`)
         }
 
+        console.log(user.usedSpace)
         user.usedSpace = user.usedSpace + file.size
+        console.log(user.usedSpace)
 
         let userFilePath;
         const filePath = path.join(__dirname, "..", "..", "usersFiles")
@@ -118,7 +119,8 @@ export class FilesController {
             throw new UnauthorizedException(`already exists`)
         }
 
-        fs.writeFileSync(userFilePath, file.buffer)
+        // @ts-ignore
+        fs.writeFileSync(userFilePath, file.buffer, 'utf8')
 
         const type = file.originalname.split('.').pop()
         let pathFile = file.originalname
@@ -129,7 +131,7 @@ export class FilesController {
         const dbFile = await this.fileModel.create({
             name: file.originalname,
             type,
-            size: file.size,
+            fileSize: file.size,
             path: pathFile,
             parent: parent?._id,
             user: user._id
@@ -138,7 +140,7 @@ export class FilesController {
         await dbFile.save()
         await user.save()
 
-        return dbFile
+        return {user: user, file: dbFile}
     }
 
     @UseGuards(FilesGuard)
@@ -155,7 +157,7 @@ export class FilesController {
 
     @UseGuards(FilesGuard)
     @Delete('/delete')
-    async delete(@Res() res: Response, @Req() req, @Query("id") id: string) {
+    async delete(@Res({ passthrough: true }) res: Response, @Req() req, @Query("id") id: string) {
         try {
             const file = await this.fileModel.findOne({_id: id, user: req.user.user._id})
             if (!file) {
@@ -163,9 +165,14 @@ export class FilesController {
             }
             await this.fileService.deleteFile(file, req.user.user._id)
             await this.fileModel.deleteOne({_id: file._id})
-            return res.json({message: 'File was deleted'})
+
+            const user = await this.userService.findOneById(req.user.user._id)
+            console.log('usedSpace - fileSize', user.usedSpace - file.fileSize)
+            user.usedSpace = user.usedSpace - file.fileSize
+            await user.save()
+
+            return user
         } catch (e) {
-            console.log(e)
             return res.status(400).json({message: 'Dir is not empty'})
         }
     }
@@ -183,9 +190,7 @@ export class FilesController {
     @UseInterceptors(FilesInterceptor('file'))
     async uploadAvatar(@Req() req, @UploadedFiles() files: Array<Express.Multer.File>) {
         const file = files[0]
-        console.log(file)
         const user = await this.userService.findOneById(req.user.user._id)
-        console.log(user)
         const avatarName = uuid.v4() + '.jpg'
         const filePath = path.resolve(__dirname, '..', 'static')
         fs.writeFileSync(path.resolve(filePath, avatarName), file.buffer)
