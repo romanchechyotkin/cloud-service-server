@@ -24,4 +24,10 @@ export class UsersService {
         return user
     }
 
+    async upload(fileSize: number, user) {
+        let size = user.usedSpace + fileSize
+        const updatedUser = await this.userModel.updateOne({_id: user._id}, {$set: {usedSpace: size}})
+        return updatedUser
+    }
+
 }

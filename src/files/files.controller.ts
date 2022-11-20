@@ -1,9 +1,8 @@
 import {
     Body,
     Controller, Delete,
-    Get,
+    Get, HttpException, HttpStatus,
     Post, Query, Req, Res,
-    UnauthorizedException,
     UploadedFiles,
     UseGuards,
     UseInterceptors
@@ -13,17 +12,19 @@ import {InjectModel} from "@nestjs/mongoose";
 import {Model} from "mongoose";
 import {FilesService} from "./files.service";
 import {FilesGuard} from "./guards/files.guard";
-import {FilesInterceptor} from "@nestjs/platform-express";
+import {FileFieldsInterceptor, FilesInterceptor} from "@nestjs/platform-express";
 import {UsersService} from "../users/users.service";
 import * as path from "path";
 import * as fs from "fs";
 import * as uuid from "uuid";
 import {Response} from "express";
+import {User, UserDocument} from "../users/user.schema";
 
 @Controller('files')
 export class FilesController {
 
     constructor(@InjectModel (File.name) private fileModel: Model<FileDocument>,
+                @InjectModel (User.name) private userModel: Model<UserDocument>,
                 private userService: UsersService,
                 private fileService: FilesService) {}
 
@@ -87,60 +88,70 @@ export class FilesController {
 
     @UseGuards(FilesGuard)
     @Post("/uploadFile")
-    @UseInterceptors(FilesInterceptor('file'))
-    async uploadFile(@UploadedFiles() files: Array<Express.Multer.File>,
+    // @UseInterceptors(FilesInterceptor('file'))
+    @UseInterceptors(FileFieldsInterceptor([
+        { name: 'file', maxCount: 1},
+    ]))
+    async uploadFile(@UploadedFiles() files,
                      @Body() fileDto,
                      @Req() req
     ) {
-        console.log(files)
-        const file = files[0]
+        try {
+            const uploadFile = files.file
+            const file = uploadFile[0]
 
-        const parent = await this.fileModel.findOne({user: req.user.user._id, _id: fileDto.parent})
-        const user = await this.userService.findOneById(req.user.user._id)
+            const parent = await this.fileModel.findOne({user: req.user.user._id, _id: fileDto.parent})
+            let user = await this.userModel.findOne({_id: req.user.user._id})
 
-        if (user.usedSpace + file.size > user.diskSpace) {
-            throw new UnauthorizedException(`full disk space`)
+            if (user.usedSpace + file.size > user.diskSpace) {
+                throw new HttpException('full disk', HttpStatus.BAD_REQUEST)
+            }
+
+            await this.userModel.updateOne({_id: req.user.user._id}, {$inc: {usedSpace: file.size}})
+
+            let userFilePath;
+            const filePath = path.join(__dirname, "..", "..", "usersFiles")
+
+            if (parent) {
+                userFilePath = `${filePath}\\${user._id}\\${parent.path}\\${file.originalname}`
+            } else {
+                userFilePath = `${filePath}\\${user._id}\\${file.originalname}`
+            }
+
+            if (fs.existsSync(userFilePath)) {
+                throw new HttpException('already exists', HttpStatus.BAD_REQUEST)
+            }
+
+            // fs.writeFile(userFilePath, file.buffer, {encoding: "utf-8"}, (err) => {
+            //     if (err) {
+            //         throw new HttpException(`${err}`, HttpStatus.BAD_REQUEST)
+            //     }
+            // })
+
+            fs.writeFileSync(userFilePath, file.buffer)
+
+            const type = file.originalname.split('.').pop()
+            let pathFile = file.originalname
+            if (parent) {
+                pathFile = parent.path + "\\" + file.originalname
+            }
+
+            const dbFile = await this.fileModel.create({
+                name: file.originalname,
+                type,
+                fileSize: file.size,
+                path: pathFile,
+                parent: parent?._id,
+                user: user._id
+            })
+
+            await dbFile.save()
+            await user.save()
+
+            return {user: user, file: dbFile}
+        } catch (e) {
+            console.log(e)
         }
-
-        console.log(user.usedSpace)
-        user.usedSpace = user.usedSpace + file.size
-        console.log(user.usedSpace)
-
-        let userFilePath;
-        const filePath = path.join(__dirname, "..", "..", "usersFiles")
-
-        if (parent) {
-            userFilePath = `${filePath}\\${user._id}\\${parent.path}\\${file.originalname}`
-        } else {
-            userFilePath = `${filePath}\\${user._id}\\${file.originalname}`
-        }
-
-        if (fs.existsSync(userFilePath)) {
-            throw new UnauthorizedException(`already exists`)
-        }
-
-        // @ts-ignore
-        fs.writeFileSync(userFilePath, file.buffer, 'utf8')
-
-        const type = file.originalname.split('.').pop()
-        let pathFile = file.originalname
-        if (parent) {
-            pathFile = parent.path + "\\" + file.originalname
-        }
-
-        const dbFile = await this.fileModel.create({
-            name: file.originalname,
-            type,
-            fileSize: file.size,
-            path: pathFile,
-            parent: parent?._id,
-            user: user._id
-        })
-
-        await dbFile.save()
-        await user.save()
-
-        return {user: user, file: dbFile}
     }
 
     @UseGuards(FilesGuard)
@@ -151,7 +162,7 @@ export class FilesController {
         if (fs.existsSync(filePath)) {
             res.download(filePath, file.name)
         } else {
-            throw new UnauthorizedException(`Download error`)
+            throw new HttpException('download error', HttpStatus.BAD_REQUEST)
         }
     }
 
@@ -163,11 +174,11 @@ export class FilesController {
             if (!file) {
                 return res.status(400).json({message: 'file not found'})
             }
+
             await this.fileService.deleteFile(file, req.user.user._id)
             await this.fileModel.deleteOne({_id: file._id})
 
             const user = await this.userService.findOneById(req.user.user._id)
-            console.log('usedSpace - fileSize', user.usedSpace - file.fileSize)
             user.usedSpace = user.usedSpace - file.fileSize
             await user.save()
 
