@@ -94,7 +94,8 @@ export class FilesController {
     ]))
     async uploadFile(@UploadedFiles() files,
                      @Body() fileDto,
-                     @Req() req
+                     @Req() req,
+                     @Res({ passthrough: true }) res
     ) {
         try {
             const uploadFile = files.file
@@ -104,7 +105,7 @@ export class FilesController {
             let user = await this.userModel.findOne({_id: req.user.user._id})
 
             if (user.usedSpace + file.size > user.diskSpace) {
-                throw new HttpException('full disk', HttpStatus.BAD_REQUEST)
+                return res.status(400).json({message: 'There no space on the disk'})
             }
 
             await this.userModel.updateOne({_id: req.user.user._id}, {$inc: {usedSpace: file.size}})
@@ -119,7 +120,7 @@ export class FilesController {
             }
 
             if (fs.existsSync(userFilePath)) {
-                throw new HttpException('already exists', HttpStatus.BAD_REQUEST)
+                return res.status(400).json({message: 'File already exist'})
             }
 
             // fs.writeFile(userFilePath, file.buffer, {encoding: "utf-8"}, (err) => {
@@ -147,6 +148,7 @@ export class FilesController {
 
             await dbFile.save()
             await user.save()
+            console.log(user)
 
             return {user: user, file: dbFile}
         } catch (e) {
@@ -162,7 +164,7 @@ export class FilesController {
         if (fs.existsSync(filePath)) {
             res.download(filePath, file.name)
         } else {
-            throw new HttpException('download error', HttpStatus.BAD_REQUEST)
+            return res.status(400).json({message: 'download error'})
         }
     }
 
